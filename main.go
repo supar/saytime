@@ -23,6 +23,11 @@ func main() {
 
 }
 
+func (tm *Time) UnmarshalJSON(data []byte) (err error) {
+	(*tm), err = ParseFloated(data)
+	return
+}
+
 func ParseFloated(f []byte) (t Time, err error) {
 	var (
 		miliPart []byte

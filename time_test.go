@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -57,6 +58,33 @@ func Test_DateTimeInput(t *testing.T) {
 			if nsec != (int(time.Millisecond) * msec) {
 				t.Error("invalid miliseconds value")
 			}
+		}
+	}
+}
+
+func Test_UnmmarshalJSONDateTime(t *testing.T) {
+	type tm struct {
+		DateTime Time `json:"time"`
+	}
+
+	data := []struct {
+		in, out string
+	}{
+		{`{"time":180213}`, "180213.000000"},
+		{`{"time":180213.13}`, "180213.130000"},
+	}
+
+	for i, l := 0, len(data); i < l; i++ {
+		dt := tm{}
+
+		err := json.Unmarshal([]byte(data[i].in), &dt)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if f := dt.DateTime.Format(DateFloatFormat); f != data[i].out {
+			t.Error("not equal: " + data[i].out + " <=> " + f)
 		}
 	}
 }
