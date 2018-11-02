@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,8 +30,8 @@ type ResponseIface interface {
 }
 
 type Response struct {
-	Time  *Time  `json:"time,omitempty"`
-	Error *Error `json:"error,omitempty"`
+	Time  interface{} `json:"time,omitempty"`
+	Error *Error      `json:"error,omitempty"`
 }
 
 type Error struct {
@@ -51,11 +52,28 @@ var (
 )
 
 func main() {
+	http.Handle("/time/now", NewHandler("GET", timeNow))
+	http.Handle("/time/string", NewHandler("GET", timeString))
+	http.Handle("/time/add", NewHandler("GET", timeAdd))
+	http.Handle("/time/set", NewHandler("POST", timeSet))
+	http.Handle("/time/reset", NewHandler("POST", timeRest))
 
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func timeNow(r *http.Request) ResponseIface {
 	tm := NewTime().Delta(GlobalDelta)
+
+	return Response{
+		Time: &tm,
+	}
+}
+
+func timeString(r *http.Request) ResponseIface {
+	tm := time.Now().Format(time.RFC3339)
 
 	return Response{
 		Time: &tm,
@@ -117,12 +135,18 @@ func timeRest(r *http.Request) ResponseIface {
 }
 
 // Create http handler
-func NewHandler(fn Controller) http.HandlerFunc {
+func NewHandler(method string, fn Controller) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
 			data     []byte
 			response ResponseIface
 		)
+
+		if r.Method != strings.ToUpper(method) {
+			http.NotFound(w, r)
+
+			return
+		}
 
 		if response = fn(r); response == nil {
 			return
@@ -153,6 +177,10 @@ func (tm Time) Delta(dl Delta) Time {
 
 // Get returns encoded data ready to send to client
 func (s Response) Get() (data []byte, err error) {
+	if s.Time == nil && s.Error == nil {
+		return
+	}
+
 	return json.Marshal(s)
 }
 
