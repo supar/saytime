@@ -95,7 +95,7 @@ func timeString(r *http.Request) ResponseIface {
 	}
 
 	return Response{
-		Time: dateTime.Format(time.RFC3339),
+		Time: dateTime.Format(time.RFC3339Nano),
 	}
 }
 
@@ -132,7 +132,7 @@ func timeAdd(r *http.Request) ResponseIface {
 }
 
 func timeSet(r *http.Request) ResponseIface {
-	tm, err := parseDateTime([]byte(r.PostFormValue("time")))
+	tm, err := parseDateTime([]byte(r.FormValue("time")))
 
 	if err != nil {
 		return Response{
