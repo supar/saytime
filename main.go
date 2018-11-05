@@ -11,10 +11,12 @@ import (
 	"time"
 )
 
+// Time wrapper to change json parsing
 type Time struct {
 	time.Time
 }
 
+// Delta represents time difference
 type Delta struct {
 	sync.Mutex
 	time.Duration
@@ -29,25 +31,30 @@ type ResponseIface interface {
 	Status() int
 }
 
+// Response represents body answer datetime or error
 type Response struct {
 	Time  interface{} `json:"time,omitempty"`
 	Error *Error      `json:"error,omitempty"`
 }
 
+// Error is message and http code
 type Error struct {
 	Code    int    `json:"-"`
 	Message string `json:"message"`
 }
 
+// Controller represents function that process request
 type Controller func(*http.Request) ResponseIface
 
 const (
+	// DateFloatFormat keeps datetime float format
 	DateFloatFormat = "060102.150405"
 )
 
 var (
+	// ErrDateFormat explains required date format
 	ErrDateFormat = errors.New("unexpected date format YYMMDD")
-
+	// GlobalDelta keeps time delta between now and received datetime
 	GlobalDelta = Delta{}
 )
 
@@ -65,7 +72,7 @@ func main() {
 }
 
 func timeNow(r *http.Request) ResponseIface {
-	tm := NewTime().Delta(GlobalDelta)
+	tm := NewTime().Delta(GlobalDelta).UTC()
 
 	return Response{
 		Time: &tm,
@@ -73,10 +80,22 @@ func timeNow(r *http.Request) ResponseIface {
 }
 
 func timeString(r *http.Request) ResponseIface {
-	tm := time.Now().Format(time.RFC3339)
+	var (
+		dateTime Time
+		err      error
+	)
+
+	if dateTime, err = parseDateTime([]byte(r.URL.Query().Get("time"))); err != nil {
+		return Response{
+			Error: &Error{
+				Code:    500,
+				Message: err.Error(),
+			},
+		}
+	}
 
 	return Response{
-		Time: &tm,
+		Time: dateTime.Format(time.RFC3339),
 	}
 }
 
@@ -134,7 +153,7 @@ func timeRest(r *http.Request) ResponseIface {
 	return Response{}
 }
 
-// Create http handler
+// NewHandler create http handler
 func NewHandler(method string, fn Controller) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
@@ -169,6 +188,12 @@ func NewTime() Time {
 	}
 }
 
+func (tm Time) UTC() Time {
+	return Time{
+		Time: tm.Time.UTC(),
+	}
+}
+
 func (tm Time) Delta(dl Delta) Time {
 	return Time{
 		tm.Add(dl.Duration).AddDate(dl.Year, dl.Month, dl.Day),
@@ -198,6 +223,7 @@ func (s Response) Status() int {
 	return 200
 }
 
+// MarshalJSON encode data to JSON
 func (t Time) MarshalJSON() ([]byte, error) {
 	var tm = make([]byte, 0, len(DateFloatFormat)+2)
 
